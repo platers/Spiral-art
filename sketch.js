@@ -3,13 +3,16 @@ var dr = 0.02;
 
 function setup(){
     createCanvas(800, 800);
-    frameRate(10);
 
+}
+
+function drawSpiral(widths){
+    
     noFill();
     var a = 0;
     var r = 5;
     for(var i = 0; i < 30000; i++){
-        strokeWeight(Math.random() * 10);
+        strokeWeight(widths[i]);
         beginShape();
         a -= da;
         r -= dr;
@@ -24,8 +27,4 @@ function setup(){
         r -= 2 * dr;
         endShape();
     }
-}
-
-function draw(){
-    
 }
