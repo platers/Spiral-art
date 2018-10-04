@@ -1,4 +1,3 @@
-
 var Genetic = Genetic || (function(){
 	
 	'use strict';
@@ -110,6 +109,7 @@ var Genetic = Genetic || (function(){
 		this.start = function() {
 			
 			var i;
+			var cnt = 0;
 			var self = this;
 			
 			function mutateOrNot(entity) {
@@ -121,68 +121,83 @@ var Genetic = Genetic || (function(){
 			for (i=0;i<this.configuration.size;++i)  {
 				this.entities.push(Clone(this.seed()));
 			}
-			
-			for (i=0;i<this.configuration.iterations;++i) {
-				// reset for each generation
-				this.internalGenState = {};
-				
-				// score and sort
-				var pop = this.entities
-					.map(function (entity) {
-						return {"fitness": self.fitness(entity), "entity": entity };
-					})
-					.sort(function (a, b) {
-						return self.optimize(a.fitness, b.fitness) ? -1 : 1;
-					});
-				
-				// generation notification
-				var mean = pop.reduce(function (a, b) { return a + b.fitness; }, 0)/pop.length;
-				var stdev = Math.sqrt(pop
-					.map(function (a) { return (a.fitness - mean) * (a.fitness - mean); })
-					.reduce(function (a, b) { return a+b; }, 0)/pop.length);
-					
-				var stats = {
-					"maximum": pop[0].fitness
-					, "minimum": pop[pop.length-1].fitness
-					, "mean": mean
-					, "stdev": stdev
-				};
 
-				var r = this.generation ? this.generation(pop, i, stats) : true;
-				var isFinished = (typeof r != "undefined" && !r) || (i == this.configuration.iterations-1);
-				
-				if (
-					this.notification
-					&& (isFinished || this.configuration["skip"] == 0 || i%this.configuration["skip"] == 0)
-				) {
-					this.sendNotification(pop.slice(0, this.maxResults), i, stats, isFinished);
-				}
+			
+			function iter(v){
+				i = 0;
+				var s = v;
+				var id = setInterval(function() {
+					// reset for each generation
+					s.internalGenState = {};
 					
-				if (isFinished)
-					break;
-				
-				// crossover and mutate
-				var newPop = [];
-				
-				if (this.configuration.fittestAlwaysSurvives) // lets the best solution fall through
-					newPop.push(pop[0].entity);
-				
-				while (newPop.length < self.configuration.size) {
+					// score and sort
+					var pop = s.entities
+						.map(function (entity) {
+							return {"fitness": self.fitness(entity), "entity": entity };
+						})
+						.sort(function (a, b) {
+							return self.optimize(a.fitness, b.fitness) ? -1 : 1;
+						});
+					
+					// generation notification
+					var mean = pop.reduce(function (a, b) { return a + b.fitness; }, 0)/pop.length;
+					var stdev = Math.sqrt(pop
+						.map(function (a) { return (a.fitness - mean) * (a.fitness - mean); })
+						.reduce(function (a, b) { return a+b; }, 0)/pop.length);
+						
+					var stats = {
+						"maximum": pop[0].fitness
+						, "minimum": pop[pop.length-1].fitness
+						, "mean": mean
+						, "stdev": stdev
+					};
+
+					var r = s.generation ? s.generation(pop, i, stats) : true;
+					var isFinished = (typeof r != "undefined" && !r) || (i == s.configuration.iterations-1);
+					
 					if (
-						this.crossover // if there is a crossover function
-						&& Math.random() <= this.configuration.crossover // base crossover on specified probability
-						&& newPop.length+1 < self.configuration.size // keeps us from going 1 over the max population size
+						s.notification
+						&& (isFinished || s.configuration["skip"] == 0 || i%s.configuration["skip"] == 0)
 					) {
-						var parents = this.select2(pop);
-						var children = this.crossover(Clone(parents[0]), Clone(parents[1])).map(mutateOrNot);
-						newPop.push(children[0], children[1]);
-					} else {
-						newPop.push(mutateOrNot(self.select1(pop)));
+						s.sendNotification(pop.slice(0, s.maxResults), i, stats, isFinished);
 					}
-				}
-				
-				this.entities = newPop;
+						
+					if (isFinished == false){
+						
+						// crossover and mutate
+						var newPop = [];
+						
+						if (s.configuration.fittestAlwaysSurvives) // lets the best solution fall through
+							newPop.push(pop[0].entity);
+						
+						while (newPop.length < self.configuration.size) {
+							if (
+								s.crossover // if there is a crossover function
+								&& Math.random() <= s.configuration.crossover // base crossover on specified probability
+								&& newPop.length+1 < self.configuration.size // keeps us from going 1 over the max population size
+							) {
+								var parents = s.select2(pop);
+								var children = s.crossover(Clone(parents[0]), Clone(parents[1])).map(mutateOrNot);
+								newPop.push(children[0], children[1]);
+							} else {
+								newPop.push(mutateOrNot(self.select1(pop)));
+							}
+						}
+						
+						s.entities = newPop;
+						i++;
+						cnt++;
+						console.log(cnt);
+					} else{
+						clearInterval(id);
+					}
+					
+				}, 1000);
+
 			}
+			iter(this);
+			
+			
 		}
 		
 		this.sendNotification = function(pop, generation, stats, isFinished) {
@@ -198,7 +213,7 @@ var Genetic = Genetic || (function(){
 				postMessage(response);
 			} else {
 				// self declared outside of scope
-				self.notification(response.pop.map(Serialization.parse), response.generation, response.stats, response.isFinished);
+				this.notification(response.pop.map(Serialization.parse), response.generation, response.stats, response.isFinished);
 			}
 			
 		};
@@ -216,52 +231,48 @@ var Genetic = Genetic || (function(){
 		}
 		
 		// determine if we can use webworkers
-		this.usingWebWorker = this.configuration.webWorkers
-			&& typeof Blob != "undefined"
-			&& typeof Worker != "undefined"
-			&& typeof window.URL != "undefined"
-			&& typeof window.URL.createObjectURL != "undefined";
+		this.usingWebWorker = false;
 		
 		function addslashes(str) {
 			return str.replace(/[\\"']/g, '\\$&').replace(/\u0000/g, '\\0');
 		}
-			
-		// bootstrap webworker script
-		var blobScript = "'use strict'\n";
-		blobScript += "var Serialization = {'stringify': " + Serialization.stringify.toString() + ", 'parse': " + Serialization.parse.toString() + "};\n";
-		blobScript += "var Clone = " + Clone.toString() + ";\n";
+		genetic.start()
+		// // bootstrap webworker script
+		// var blobScript = "'use strict'\n";
+		// blobScript += "var Serialization = {'stringify': " + Serialization.stringify.toString() + ", 'parse': " + Serialization.parse.toString() + "};\n";
+		// blobScript += "var Clone = " + Clone.toString() + ";\n";
 		
-		// make available in webworker
-		blobScript += "var Optimize = Serialization.parse(\"" + addslashes(Serialization.stringify(Optimize)) + "\");\n";
-		blobScript += "var Select1 = Serialization.parse(\"" + addslashes(Serialization.stringify(Select1)) + "\");\n";
-		blobScript += "var Select2 = Serialization.parse(\"" + addslashes(Serialization.stringify(Select2)) + "\");\n";
+		// // make available in webworker
+		// blobScript += "var Optimize = Serialization.parse(\"" + addslashes(Serialization.stringify(Optimize)) + "\");\n";
+		// blobScript += "var Select1 = Serialization.parse(\"" + addslashes(Serialization.stringify(Select1)) + "\");\n";
+		// blobScript += "var Select2 = Serialization.parse(\"" + addslashes(Serialization.stringify(Select2)) + "\");\n";
 		
-		// materialize our ga instance in the worker
-		blobScript += "var genetic = Serialization.parse(\"" + addslashes(Serialization.stringify(this)) + "\");\n";
-		blobScript += "onmessage = function(e) { genetic.start(); }\n";
+		// // materialize our ga instance in the worker
+		// blobScript += "var genetic = Serialization.parse(\"" + addslashes(Serialization.stringify(this)) + "\");\n";
+		// blobScript += "onmessage = function(e) { genetic.start(); }\n";
 		
-		var self = this;
+		// var self = this;
 		
-		if (this.usingWebWorker) {
-			// webworker
-			var blob = new Blob([blobScript]);
-			var worker = new Worker(window.URL.createObjectURL(blob));
-			worker.onmessage = function(e) {
-			  var response = e.data;
-			  self.notification(response.pop.map(Serialization.parse), response.generation, response.stats, response.isFinished);
-			};
-			worker.onerror = function(e) {
-				alert('ERROR: Line ' + e.lineno + ' in ' + e.filename + ': ' + e.message);
-			};
-			worker.postMessage("");
-		} else {
-			// simulate webworker
-			(function(){
-				var onmessage;
-				eval(blobScript);
-				onmessage(null);
-			})();
-		}
+		// if (this.usingWebWorker) {
+		// 	// webworker
+		// 	var blob = new Blob([blobScript]);
+		// 	var worker = new Worker(window.URL.createObjectURL(blob));
+		// 	worker.onmessage = function(e) {
+		// 	  var response = e.data;
+		// 	  self.notification(response.pop.map(Serialization.parse), response.generation, response.stats, response.isFinished);
+		// 	};
+		// 	worker.onerror = function(e) {
+		// 		alert('ERROR: Line ' + e.lineno + ' in ' + e.filename + ': ' + e.message);
+		// 	};
+		// 	worker.postMessage("");
+		// } else {
+		// 	// simulate webworker
+		// 	(function(){
+		// 		var onmessage;
+		// 		eval(blobScript);
+		// 		onmessage(null);
+		// 	})();
+		// }
 	}
 	
 	return {
