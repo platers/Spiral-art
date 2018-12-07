@@ -1,27 +1,14 @@
 <html>
   <head>
       <canvas id="myCanvas" width="600" height="600"></canvas>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.7.2/p5.js"></script>
-    <script src="globals.js"></script>
-    <script src="sketch.js"></script>
-    <script>
-        var myp5 = new p5(s);
-        function randomArray(n){
-                var a = [];
-                for(var i = 0; i < n; i++){
-                    a.push(Math.random(10));
-                }
-                //console.log(a.length);
-                return a;
-            }
-        myp5.widths = randomArray(30000);
-        console.log(myp5);
-    
-        </script>
-    <script src="genetic.js"></script>
-    <script src="ga.js"></script>
-    
+        <link href="style.css">
     
    
   </head>
+  <body>
+    <canvas id="c" width="600" height="600"></canvas>
+    
+    <button onclick="draw()">Draw</button> 
+  </body>
+  <script src="script.js"></script>
 </html>
