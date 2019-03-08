@@ -4,9 +4,9 @@ When someone says my projects arn't useful
 
 A short python notebook that can convert images to spirals. Works best with images of width 1000 or larger.
 
-##Results
+## Results
 
-##Todo
+## Todo
 Find cool images to spiralfy
 Get better results for small images (genetic algorithm?)
 Smoothen lines
